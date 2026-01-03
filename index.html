@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Fap Tracker</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;800&family=Outfit:wght@200;400;600&family=Great+Vibes&display=swap" rel="stylesheet">
+    <style>
+      :root {
+        --color-bg: #050505;
+      }
+      body {
+        font-family: 'Outfit', sans-serif;
+        background-color: var(--color-bg);
+        color: #e7e5e4;
+      }
+      h1, h2, h3, .font-serif {
+        font-family: 'Cinzel', serif;
+      }
+      .font-calligraphy {
+        font-family: 'Great Vibes', cursive;
+      }
+      
+      /* Ambient Background Animation (Dashboard) */
+      .aurora-bg {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        z-index: -1;
+        background: #050505;
+        overflow: hidden;
+      }
+      .aurora-blob {
+        position: absolute;
+        filter: blur(80px);
+        opacity: 0.4;
+        animation: float 10s infinite ease-in-out alternate;
+      }
+      .blob-1 {
+        top: -10%;
+        left: -10%;
+        width: 50vw;
+        height: 50vw;
+        background: #4c0519; /* Rose-950 */
+        animation-delay: 0s;
+      }
+      .blob-2 {
+        bottom: -10%;
+        right: -10%;
+        width: 60vw;
+        height: 60vw;
+        background: #2e1065; /* Purple-950 */
+        animation-delay: -2s;
+      }
+      .blob-3 {
+        top: 40%;
+        left: 40%;
+        width: 40vw;
+        height: 40vw;
+        background: #7f1d1d; /* Red-900 */
+        animation-delay: -4s;
+        opacity: 0.2;
+      }
+
+      /* Landing Page Flowing Gradient */
+      .landing-bg {
+        background: linear-gradient(-45deg, #2e020b, #881337, #4c0519, #581c87, #0f172a);
+        background-size: 400% 400%;
+        animation: gradient-flow 15s ease infinite;
+      }
+
+      /* Splash Animation */
+      @keyframes ripple-expand {
+        0% { transform: translate(-50%, -50%) scale(0); opacity: 0.8; }
+        100% { transform: translate(-50%, -50%) scale(10); opacity: 0; }
+      }
+
+      .splash-ring {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        width: 20vw;
+        height: 20vw;
+        border-radius: 50%;
+        background: radial-gradient(circle, rgba(244,63,94,0.8) 0%, rgba(88,28,135,0.4) 60%, transparent 100%);
+        transform: translate(-50%, -50%) scale(0);
+        pointer-events: none;
+        z-index: 9999;
+        mix-blend-mode: screen;
+      }
+      
+      .animate-splash {
+        animation: ripple-expand 1.5s cubic-bezier(0.165, 0.84, 0.44, 1) forwards;
+      }
+
+      @keyframes gradient-flow {
+        0% { background-position: 0% 50%; }
+        50% { background-position: 100% 50%; }
+        100% { background-position: 0% 50%; }
+      }
+
+      @keyframes float {
+        0% { transform: translate(0, 0) scale(1); }
+        100% { transform: translate(20px, 40px) scale(1.1); }
+      }
+
+      /* Glass Utilities */
+      .glass-panel {
+        background: rgba(20, 20, 20, 0.4);
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+      }
+      
+      .glass-card {
+        background: linear-gradient(180deg, rgba(30, 30, 30, 0.4) 0%, rgba(10, 10, 10, 0.6) 100%);
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 255, 255, 0.05);
+        box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.36);
+      }
+
+      /* Hide Scrollbar but allow scroll */
+      .no-scrollbar::-webkit-scrollbar {
+        display: none;
+      }
+      .no-scrollbar {
+        -ms-overflow-style: none;
+        scrollbar-width: none;
+      }
+    </style>
+  <script type="importmap">
+{
+  "imports": {
+    "recharts": "https://esm.sh/recharts@^3.6.0",
+    "lucide-react": "https://esm.sh/lucide-react@^0.562.0",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
+    "@google/genai": "https://esm.sh/@google/genai@^1.34.0",
+    "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@^2.45.1",
+    "react/": "https://esm.sh/react@^19.2.3/",
+    "react": "https://esm.sh/react@^19.2.3",
+    "three": "https://esm.sh/three@0.160.0",
+    "@imgly/background-removal": "https://cdn.jsdelivr.net/npm/@imgly/background-removal@1.7.0/+esm"
+  }
+}
+</script>
+<link rel="stylesheet" href="/index.css">
+</head>
+  <body class="antialiased overflow-hidden selection:bg-rose-500 selection:text-white">
+    <!-- Ambient Background Layer -->
+    <div class="aurora-bg">
+      <div class="aurora-blob blob-1"></div>
+      <div class="aurora-blob blob-2"></div>
+      <div class="aurora-blob blob-3"></div>
+    </div>
+    <div id="root" class="h-screen w-screen overflow-hidden"></div>
+  <script type="module" src="/index.tsx"></script>
+</body>
+</html>
