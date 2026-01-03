@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Flame, ArrowRight, User as UserIcon, AlertTriangle, Copy, Check, ExternalLink } from 'lucide-react';
+import { Flame, ArrowRight, User as UserIcon } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { isSupabaseConfigured } from '../services/supabase';
 
@@ -17,7 +17,6 @@ export const LandingPage: React.FC<{ onEnter: () => void }> = ({ onEnter }) => {
   const { user, signInWithGoogle, signInAsGuest } = useAuth();
   const [authStage, setAuthStage] = useState<'initial' | 'authenticating' | 'ready' | 'entering'>('initial');
   const [splash, setSplash] = useState(false);
-  const [copied, setCopied] = useState(false);
 
   // If user is already logged in (or guest), skip to "ready"
   useEffect(() => {
@@ -55,12 +54,6 @@ export const LandingPage: React.FC<{ onEnter: () => void }> = ({ onEnter }) => {
     setTimeout(() => {
         onEnter(); 
     }, 1000);
-  };
-
-  const copyOrigin = () => {
-    navigator.clipboard.writeText(window.location.origin);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
   };
 
   return (
@@ -139,41 +132,6 @@ export const LandingPage: React.FC<{ onEnter: () => void }> = ({ onEnter }) => {
                 Enter <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
               </span>
             </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Diagnostics / Debug Info for 403 Errors - ALWAYS VISIBLE IN DEV */}
-      <div className="absolute bottom-8 w-full max-w-lg px-6 animate-in slide-in-from-bottom-10 fade-in duration-700">
-        <div className="glass-panel p-4 rounded-xl border border-yellow-500/20 bg-black/40 backdrop-blur-md shadow-2xl">
-          <div className="flex items-start gap-3 mb-3">
-             <AlertTriangle className="text-yellow-500 shrink-0 mt-0.5" size={16} />
-             <div className="flex-1">
-               <p className="text-[10px] text-yellow-500 font-bold uppercase tracking-wider mb-1">
-                 Cloud Environment Config
-               </p>
-               <p className="text-[10px] text-stone-400 leading-relaxed">
-                 To enable Google Auth, copy the URL below and add it to 
-                 <strong className="text-stone-300"> Authorized JavaScript Origins</strong> in your Google Cloud Console.
-               </p>
-             </div>
-          </div>
-          <div className="flex items-center gap-2 bg-black/60 rounded-lg p-3 border border-white/5 relative group">
-             <code className="text-[11px] text-rose-200 font-mono truncate flex-1 select-all">
-               {window.location.origin}
-             </code>
-             <button 
-               onClick={copyOrigin}
-               className="p-2 hover:bg-white/10 rounded-md transition-colors text-stone-400 hover:text-white"
-               title="Copy to Clipboard"
-             >
-               {copied ? <Check size={16} className="text-green-500" /> : <Copy size={16} />}
-             </button>
-          </div>
-          <div className="mt-2 text-right">
-             <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noreferrer" className="text-[10px] text-rose-500 hover:text-rose-400 hover:underline inline-flex items-center gap-1">
-               Open Google Cloud Console <ExternalLink size={10} />
-             </a>
           </div>
         </div>
       </div>
