@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Flame, Trophy, Search, Plus, Settings, Droplets } from 'lucide-react';
 import { Star } from '../../types';

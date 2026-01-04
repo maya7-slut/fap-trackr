@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Flame, Heart } from 'lucide-react';
 import { Star } from '../../types';
@@ -13,6 +14,8 @@ export const XPModal: React.FC<XPModalProps> = ({ star, onClose, onConfirm }) =>
   const [note, setNote] = useState('');
   const [manualAmount, setManualAmount] = useState(1);
 
+  const displayImage = star.gallery?.[0]?.url;
+
   return (
     <div className="fixed inset-0 z-[90] flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-xl transition-all duration-300" onClick={onClose} />
@@ -20,9 +23,9 @@ export const XPModal: React.FC<XPModalProps> = ({ star, onClose, onConfirm }) =>
         <div className="flex flex-col items-center mb-6">
            <div className="w-20 h-20 rounded-full p-1 bg-gradient-to-br from-rose-500 to-purple-600 shadow-lg mb-4">
              <div className="w-full h-full rounded-full overflow-hidden border-2 border-black">
-               {star.images[0] ? (
+               {displayImage ? (
                  <img 
-                    src={star.images[0]} 
+                    src={displayImage} 
                     className="w-full h-full object-cover object-top" 
                     alt={star.name}
                  />

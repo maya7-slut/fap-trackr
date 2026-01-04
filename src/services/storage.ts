@@ -1,7 +1,11 @@
-import { Star } from '../types';
+
+import { Star, GalleryItem } from '../types';
 import { supabase, isSupabaseConfigured } from './supabase';
 
 const STORAGE_KEY = 'star_mastery_data_v1';
+
+// --- Helper: Generate ID ---
+const generateId = () => Math.random().toString(36).substring(2, 9);
 
 // --- Helper: Base64 to Blob for Supabase Upload ---
 const base64ToBlob = (base64: string): Blob => {
@@ -18,7 +22,6 @@ const base64ToBlob = (base64: string): Blob => {
 
 // --- Helper: Upload Image to Supabase ---
 const uploadToSupabase = async (userId: string, starId: string, base64: string, prefix: string = 'img'): Promise<string> => {
-  // If it's already a URL (http/https) or generic path, skip upload
   if (!base64 || !base64.startsWith('data:')) return base64;
   
   try {
@@ -26,15 +29,11 @@ const uploadToSupabase = async (userId: string, starId: string, base64: string, 
     const ext = blob.type.split('/')[1] || 'jpg';
     const fileName = `${userId}/${starId}/${prefix}_${Date.now()}.${ext}`;
 
-    // Upload to 'star-gallery' bucket
     const { error } = await supabase.storage
       .from('star-gallery')
       .upload(fileName, blob, { contentType: blob.type, upsert: true });
 
-    if (error) {
-      console.error("[Storage] Upload Error:", error);
-      throw error;
-    }
+    if (error) throw error;
 
     const { data: { publicUrl } } = supabase.storage
       .from('star-gallery')
@@ -42,15 +41,15 @@ const uploadToSupabase = async (userId: string, starId: string, base64: string, 
 
     return publicUrl;
   } catch (error) {
-    console.error("Image upload failed:", error);
-    return base64; // Fallback to keeping the base64 string if upload fails
+    console.error("Image upload failed, using local base64:", error);
+    return base64; 
   }
 };
 
 // --- Primary API ---
 
 export const getStars = async (userId?: string): Promise<Star[]> => {
-  // 1. Cloud Mode (Only if ID is valid and NOT 'guest')
+  // 1. Cloud Mode
   if (userId && userId !== 'guest' && isSupabaseConfigured) {
     try {
       const { data, error } = await supabase
@@ -61,28 +60,41 @@ export const getStars = async (userId?: string): Promise<Star[]> => {
 
       if (error) throw error;
       
-      // Transform DB snake_case to app camelCase
-      return (data || []).map((s: any) => ({
-        id: s.id,
-        name: s.name,
-        nickname: s.nickname,
-        images: s.images || [],
-        imageCutout: s.image_cutout, 
-        xp: s.xp,
-        tags: s.tags || [],
-        bio: s.bio,
-        nationality: s.nationality,
-        dob: s.dob,
-        favorite: s.favorite,
-        streak: s.streak,
-        lastActiveDate: s.last_active_date,
-        logs: (s.logs || []).map((l: any) => ({
+      return (data || []).map((s: any) => {
+        // Migration Logic: If gallery is empty but images exist, map them
+        let gallery: GalleryItem[] = s.gallery || [];
+        
+        if (gallery.length === 0 && s.images && s.images.length > 0) {
+          gallery = s.images.map((img: string, i: number) => ({
+            id: generateId(),
+            url: img,
+            cutout: (i === 0) ? s.image_cutout : null,
+            dateAdded: new Date().toISOString()
+          }));
+        }
+
+        return {
+          id: s.id,
+          name: s.name,
+          nickname: s.nickname,
+          gallery: gallery,
+          images: [], // Deprecated
+          xp: s.xp,
+          tags: s.tags || [],
+          bio: s.bio,
+          nationality: s.nationality,
+          dob: s.dob,
+          favorite: s.favorite,
+          streak: s.streak,
+          lastActiveDate: s.last_active_date,
+          logs: (s.logs || []).map((l: any) => ({
              id: l.id,
              date: l.date,
              amount: l.amount,
              note: l.note
-        })).sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime())
-      }));
+          })).sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime())
+        };
+      });
     } catch (e) {
       console.error("Cloud fetch failed, falling back to local:", e);
     }
@@ -90,31 +102,49 @@ export const getStars = async (userId?: string): Promise<Star[]> => {
 
   // 2. Local Mode
   const localData = localStorage.getItem(STORAGE_KEY);
-  return localData ? JSON.parse(localData) : [];
+  const parsed = localData ? JSON.parse(localData) : [];
+  
+  // Local Migration
+  return parsed.map((s: any) => {
+      if (!s.gallery && s.images) {
+          s.gallery = s.images.map((img: string, i: number) => ({
+             id: generateId(),
+             url: img,
+             cutout: i === 0 ? s.imageCutout : null,
+             dateAdded: new Date().toISOString()
+          }));
+      }
+      return s;
+  });
 };
 
 export const createStar = async (star: Star, userId?: string): Promise<Star> => {
   if (userId && userId !== 'guest' && isSupabaseConfigured) {
-    console.log("[Storage] Starting CreateStar...");
     
-    // A. Upload images to Cloud first
-    const uploadedImages = await Promise.all(
-      star.images.map((img, i) => uploadToSupabase(userId, star.id, img, `main_${i}`))
-    );
-    
-    let cutoutUrl = star.imageCutout;
-    if (star.imageCutout) {
-      cutoutUrl = await uploadToSupabase(userId, star.id, star.imageCutout, 'cutout');
-    }
+    // Process Gallery Images (Upload main + cutouts)
+    const processedGallery = await Promise.all(star.gallery.map(async (item, i) => {
+       const url = await uploadToSupabase(userId, star.id, item.url, `main_${i}`);
+       const cutout = item.cutout ? await uploadToSupabase(userId, star.id, item.cutout, `cutout_${i}`) : null;
+       return { ...item, url, cutout };
+    }));
 
-    // B. Insert into DB
+    // Backward compatibility for old columns
+    const legacyImages = processedGallery.map(g => g.url);
+    const legacyCutout = processedGallery[0]?.cutout || null;
+
     const dbPayload = {
-      id: star.id, // Must be UUID if DB column is uuid
+      id: star.id,
       user_id: userId,
       name: star.name,
       nickname: star.nickname || null,
-      images: uploadedImages,
-      image_cutout: cutoutUrl || null,
+      
+      // New Column
+      gallery: processedGallery,
+      
+      // Old Columns (Sync for safety)
+      images: legacyImages,
+      image_cutout: legacyCutout,
+
       xp: star.xp,
       tags: star.tags,
       bio: star.bio || null,
@@ -125,25 +155,13 @@ export const createStar = async (star: Star, userId?: string): Promise<Star> => 
       last_active_date: star.lastActiveDate || null
     };
 
-    console.log("[Storage] DB Payload prepared:", JSON.stringify(dbPayload, null, 2));
-
     const { data, error } = await supabase.from('stars').insert(dbPayload).select().single();
+    if (error) throw error;
     
-    if (error) {
-        console.error("----- Supabase Insert Error -----");
-        console.error("Message:", error.message);
-        console.error("Details:", error.details);
-        console.error("Hint:", error.hint);
-        console.error("Code:", error.code);
-        console.error("Payload ID Type:", typeof star.id);
-        console.error("Payload ID Value:", star.id);
-        throw error;
-    }
-    
-    return { ...star, ...data, images: uploadedImages, imageCutout: cutoutUrl };
+    return { ...star, ...data, gallery: processedGallery };
   }
 
-  // Local Fallback
+  // Local Save
   const stars = await getStars();
   const updated = [...stars, star];
   localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
@@ -152,24 +170,26 @@ export const createStar = async (star: Star, userId?: string): Promise<Star> => 
 
 export const updateStar = async (star: Star, userId?: string): Promise<void> => {
   if (userId && userId !== 'guest' && isSupabaseConfigured) {
-    // 1. Check for new Base64 images to upload
-    const processedImages = await Promise.all(
-      star.images.map(img => img.startsWith('data:') ? uploadToSupabase(userId, star.id, img) : img)
-    );
+    
+    // Process Gallery Uploads
+    const processedGallery = await Promise.all(star.gallery.map(async (item, i) => {
+       // Only upload if it looks like base64
+       const url = item.url.startsWith('data:') ? await uploadToSupabase(userId, star.id, item.url, `main_${i}_${Date.now()}`) : item.url;
+       const cutout = (item.cutout && item.cutout.startsWith('data:')) ? await uploadToSupabase(userId, star.id, item.cutout, `cutout_${i}_${Date.now()}`) : item.cutout;
+       return { ...item, url, cutout };
+    }));
 
-    let cutoutUrl = star.imageCutout;
-    if (star.imageCutout && star.imageCutout.startsWith('data:')) {
-      cutoutUrl = await uploadToSupabase(userId, star.id, star.imageCutout, 'cutout');
-    }
+    const legacyImages = processedGallery.map(g => g.url);
+    const legacyCutout = processedGallery[0]?.cutout || null;
 
-    // 2. Update Star Table
     const { error } = await supabase
       .from('stars')
       .update({
         name: star.name,
         nickname: star.nickname || null,
-        images: processedImages,
-        image_cutout: cutoutUrl || null,
+        gallery: processedGallery, // Update Gallery JSONB
+        images: legacyImages,
+        image_cutout: legacyCutout,
         xp: star.xp,
         tags: star.tags,
         bio: star.bio || null,
@@ -182,16 +202,11 @@ export const updateStar = async (star: Star, userId?: string): Promise<void> => 
       .eq('id', star.id)
       .eq('user_id', userId);
 
-    if (error) {
-        console.error("[Storage] Update Failed:", error.message, error.details);
-        throw error;
-    }
+    if (error) throw error;
 
-    // 3. Sync Logs
     if (star.logs && star.logs.length > 0) {
        const latest = star.logs[0];
-       // Only upsert the latest log to save bandwidth/calls, assumes older logs don't change often
-       const { error: logError } = await supabase.from('logs').upsert({
+       await supabase.from('logs').upsert({
           id: latest.id, 
           user_id: userId,
           star_id: star.id,
@@ -199,13 +214,11 @@ export const updateStar = async (star: Star, userId?: string): Promise<void> => 
           note: latest.note,
           date: latest.date
        }, { onConflict: 'id', ignoreDuplicates: true });
-
-       if (logError) console.error("[Storage] Log Sync Failed:", logError.message, logError.details);
     }
     return;
   }
 
-  // Local Fallback
+  // Local Save
   const stars = await getStars();
   const index = stars.findIndex(s => s.id === star.id);
   if (index !== -1) {
@@ -217,13 +230,9 @@ export const updateStar = async (star: Star, userId?: string): Promise<void> => 
 export const deleteStar = async (id: string, userId?: string): Promise<void> => {
   if (userId && userId !== 'guest' && isSupabaseConfigured) {
     const { error } = await supabase.from('stars').delete().eq('id', id).eq('user_id', userId);
-    if (error) {
-         console.error("[Storage] Delete Failed:", error);
-         throw error;
-    }
+    if (error) throw error;
     return;
   }
-
   const stars = (await getStars()).filter(s => s.id !== id);
   localStorage.setItem(STORAGE_KEY, JSON.stringify(stars));
 };

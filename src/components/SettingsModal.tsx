@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Settings, Key, Sparkles, X, ChevronRight, Save, Layout, Smartphone, Palette, ArrowUp, ArrowDown, ArrowLeft, ArrowRight } from 'lucide-react';
+import { Settings, Key, Sparkles, X, ChevronRight, Save, Layout, Smartphone, Palette, Box, Check, Info } from 'lucide-react';
 import { useToast } from '../context/ToastContext';
 import { useSettings, BorderStyle, CardShape } from '../context/SettingsContext';
 
@@ -9,6 +9,36 @@ interface SettingsModalProps {
   apiKey: string;
   onSaveKey: (key: string) => void;
 }
+
+// Internal Helper for Collapsible Sections
+const SettingsSection: React.FC<{
+  icon: React.ElementType;
+  title: string;
+  colorClass: string;
+  children: React.ReactNode;
+}> = ({ icon: Icon, title, colorClass, children }) => {
+  const [isOpen, setIsOpen] = useState(false);
+
+  return (
+    <div className="border-b border-white/5 last:border-0">
+      <button 
+        onClick={() => setIsOpen(!isOpen)}
+        className="w-full flex items-center justify-between py-4 group hover:bg-white/5 px-2 -mx-2 rounded-lg transition-colors"
+      >
+        <div className={`flex items-center gap-2 text-sm font-bold uppercase tracking-wider ${colorClass} group-hover:brightness-125 transition-all`}>
+           <Icon size={14} /> {title}
+        </div>
+        <ChevronRight size={16} className={`text-stone-500 transition-transform duration-300 ${isOpen ? 'rotate-90 text-white' : ''}`} />
+      </button>
+      
+      <div className={`overflow-hidden transition-all duration-300 ease-in-out ${isOpen ? 'max-h-[600px] opacity-100 mb-6' : 'max-h-0 opacity-0 mb-0'}`}>
+         <div className="pt-2">
+           {children}
+         </div>
+      </div>
+    </div>
+  );
+};
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, apiKey, onSaveKey }) => {
   const [activeTab, setActiveTab] = useState<'general' | 'appearance'>('general');
@@ -53,11 +83,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, a
           </button>
         </div>
 
-        <div className="p-6 space-y-8 overflow-y-auto custom-scrollbar">
+        <div className="p-6 overflow-y-auto custom-scrollbar">
           
           {/* GENERAL TAB */}
           {activeTab === 'general' && (
-            <>
+            <div className="space-y-8">
               <div className="space-y-4">
                 <div className="flex items-center gap-2 text-rose-300 text-sm font-bold uppercase tracking-wider">
                   <Sparkles size={14} /> Neural Link (Gemini API)
@@ -89,19 +119,48 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, a
                    The "Pop-Out" 3D effect uses local ML.
                  </p>
               </div>
-            </>
+            </div>
           )}
 
           {/* APPEARANCE TAB */}
           {activeTab === 'appearance' && (
-            <div className="space-y-8">
+            <div className="space-y-2">
+
+              {/* Hologram Toggle */}
+              <SettingsSection title="Hologram Mode" icon={Box} colorClass="text-rose-300">
+                 <div className="bg-black/40 border border-white/10 rounded-xl p-4">
+                    <div className="flex items-center justify-between mb-4">
+                       <span className="text-sm text-stone-200">Enable 3D Pop-Out Effects</span>
+                       <button 
+                         onClick={() => updateSettings({ enableHologram: !settings.enableHologram })}
+                         className={`w-12 h-6 rounded-full transition-colors relative ${settings.enableHologram ? 'bg-rose-600' : 'bg-stone-700'}`}
+                       >
+                         <div className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform ${settings.enableHologram ? 'translate-x-6' : 'translate-x-0'}`} />
+                       </button>
+                    </div>
+
+                    <div className="bg-white/5 rounded-lg p-3 space-y-2">
+                        <div className="flex items-start gap-2">
+                           <Info size={14} className="text-stone-400 mt-0.5 shrink-0" />
+                           <p className="text-[11px] text-stone-400 leading-relaxed">
+                              <span className="text-rose-300 font-bold">How to use:</span> 
+                              To see the effect, you must first open a Star, click the <strong>3D Cube</strong> button to generate a cutout, then return to the dashboard.
+                           </p>
+                        </div>
+                        <div className="flex items-start gap-2">
+                           <Info size={14} className="text-stone-400 mt-0.5 shrink-0" />
+                           <p className="text-[11px] text-stone-400 leading-relaxed">
+                              <span className="text-stone-200 font-bold">Performance Note:</span> 
+                              If the dashboard feels choppy or battery drains quickly, disable this setting. The 3D cutout will be hidden, but not deleted.
+                           </p>
+                        </div>
+                    </div>
+                 </div>
+              </SettingsSection>
               
               {/* Manual Margins */}
-              <div className="space-y-4">
-                 <div className="flex items-center gap-2 text-blue-300 text-sm font-bold uppercase tracking-wider">
-                    <Layout size={14} /> Card Spacing Fix
-                 </div>
-                 <p className="text-[10px] text-stone-500">Adjust margins to prevent overlapping on your specific device.</p>
+              <SettingsSection title="Card Spacing Fix" icon={Layout} colorClass="text-blue-300">
+                 <p className="text-[10px] text-stone-500 mb-3">Adjust margins to prevent overlapping on your specific device.</p>
                  
                  <div className="bg-black/40 border border-white/10 rounded-xl p-6 flex flex-col items-center gap-4">
                     {/* Top */}
@@ -157,13 +216,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, a
                        <span className="text-[10px] text-stone-600">px</span>
                     </div>
                  </div>
-              </div>
+              </SettingsSection>
 
               {/* Card Shape */}
-              <div className="space-y-4">
-                 <div className="flex items-center gap-2 text-purple-300 text-sm font-bold uppercase tracking-wider">
-                    <Smartphone size={14} /> Card Shape
-                 </div>
+              <SettingsSection title="Card Shape" icon={Smartphone} colorClass="text-purple-300">
                  <div className="grid grid-cols-2 gap-3">
                     <button 
                       onClick={() => updateSettings({ cardShape: 'rectangle' })}
@@ -180,13 +236,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, a
                        <span className="text-[10px] uppercase font-bold">Pill / Round</span>
                     </button>
                  </div>
-              </div>
+              </SettingsSection>
 
               {/* Border Styles */}
-              <div className="space-y-4">
-                 <div className="flex items-center gap-2 text-amber-300 text-sm font-bold uppercase tracking-wider">
-                    <Palette size={14} /> Border Aura
-                 </div>
+              <SettingsSection title="Border Aura" icon={Palette} colorClass="text-amber-300">
                  <div className="grid grid-cols-3 gap-2">
                     {['glass', 'neon', 'glow', 'gold', 'minimal'].map((style) => (
                       <button 
@@ -198,7 +251,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, a
                       </button>
                     ))}
                  </div>
-              </div>
+              </SettingsSection>
 
             </div>
           )}

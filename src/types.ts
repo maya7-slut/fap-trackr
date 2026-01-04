@@ -1,3 +1,4 @@
+
 export enum StarCategory {
   Unawakened = 'Unawakened',
   Temptress = 'Temptress',
@@ -30,7 +31,7 @@ export interface Star {
   
   // Deprecated (kept for temporary type compatibility during migration)
   images?: string[]; 
-  imageCutout?: string; // NEW: Base64 of transparent PNG for 3D effect
+  imageCutout?: string;
 
   xp: number;
   logs: XPLog[];

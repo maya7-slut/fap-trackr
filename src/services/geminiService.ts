@@ -23,10 +23,22 @@ const mapGeminiError = (error: any): string => {
   return error.message || "An unexpected connection error occurred.";
 };
 
-// Helper to get client with dynamic key or fallback to env
+// Helper to safely get env vars
+const getEnvVar = (key: string): string | undefined => {
+  try {
+    if (typeof import.meta !== 'undefined' && (import.meta as any).env) {
+      return (import.meta as any).env[key];
+    }
+  } catch (e) { }
+  return undefined;
+};
+
+// Helper to get client with dynamic key
 const getClient = (apiKey?: string) => {
-  const key = apiKey || process.env.API_KEY;
-  if (!key) throw new Error("API Key not provided");
+  // Check passed key, then environment
+  const key = apiKey || getEnvVar('VITE_GEMINI_API_KEY');
+  
+  if (!key) throw new Error("API Key not provided. Please add it in Settings.");
   return new GoogleGenAI({ apiKey: key });
 };
 
@@ -65,7 +77,6 @@ export const generateBio = async (apiKey: string, name: string, nickname: string
 
     parts.push({ text: userPrompt });
     
-    // Fix: Using gemini-3-pro-preview for bio generation which is a complex reasoning and data extraction task.
     const response = await ai.models.generateContent({
       model: 'gemini-3-pro-preview',
       contents: { parts },
@@ -87,7 +98,6 @@ export const generateSultryPromptFromBio = async (apiKey: string, bio: string) =
     Focus on visual details, lighting (e.g. cinematic, candlelight), and a sultry atmosphere. 
     Return ONLY the prompt text, no explanations.`;
 
-    // Fix: Using gemini-3-flash-preview for general text generation tasks.
     const response = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
         contents: prompt
@@ -109,7 +119,6 @@ export const analyzeImage = async (apiKey: string, base64Data: string) => {
 
     const cleanBase64 = base64Data.split(',')[1] || base64Data;
 
-    // Fix: Using gemini-3-flash-preview for multimodal image analysis.
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
       contents: {

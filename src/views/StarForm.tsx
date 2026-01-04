@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+
+import React, { useState, useRef } from 'react';
 import { 
-  Camera, X, MoreVertical, Trash2, Layout, Upload, Sparkles, Globe, Calendar, Heart, Save, Flame, Box, Loader2
+  Camera, X, MoreVertical, Trash2, Layout, Upload, Sparkles, Globe, Calendar, Heart, Save, Flame, Box, Loader2, RefreshCw, Eraser
 } from 'lucide-react';
-import { Star } from '../../types';
+import { Star, GalleryItem } from '../../types';
 import { AIGenerator } from '../components/AIGenerator';
 import { generateBio } from '../../services/geminiService';
 import { useToast } from '../context/ToastContext';
@@ -19,11 +20,21 @@ interface StarFormProps {
   onRequestKey: () => void;
 }
 
+// Helper to create valid gallery items
+const createGalleryItem = (url: string): GalleryItem => ({
+    id: Math.random().toString(36).substring(2, 9),
+    url,
+    cutout: null,
+    dateAdded: new Date().toISOString()
+});
+
 export const StarForm: React.FC<StarFormProps> = ({ 
   initialData, mode, apiKey, onClose, onSave, onDelete, onRequestKey 
 }) => {
-  const [formData, setFormData] = useState<Partial<Star>>(initialData || { images: [], tags: [] });
-  const [activeImageIndex, setActiveImageIndex] = useState(0);
+  // Initialize with gallery structure
+  const [formData, setFormData] = useState<Partial<Star>>(initialData || { gallery: [], tags: [] });
+  const [activeGalleryIndex, setActiveGalleryIndex] = useState(0);
+  
   const [showDropdown, setShowDropdown] = useState(false);
   const [showStreakModal, setShowStreakModal] = useState(false);
   
@@ -32,12 +43,57 @@ export const StarForm: React.FC<StarFormProps> = ({
   const [progress3D, setProgress3D] = useState(0);
   const [statusMessage, setStatusMessage] = useState('');
 
+  // 3D Tilt State for Workbench
+  const previewRef = useRef<HTMLDivElement>(null);
+  const [rotation, setRotation] = useState({ x: 0, y: 0 });
+  const [isHovering, setIsHovering] = useState(false);
+
   const { showToast } = useToast();
 
-  const mainImg = formData.images?.[activeImageIndex];
+  // Derived state from Gallery
+  const gallery = formData.gallery || [];
+  const currentItem = gallery[activeGalleryIndex];
+  const mainImg = currentItem?.url;
+  const currentCutout = currentItem?.cutout;
+  
   const streak = formData.streak || 0;
-  const imageCount = formData.images?.length || 0;
+  const imageCount = gallery.length;
   const MAX_IMAGES = 10;
+
+  // --- Tilt Logic ---
+  const handleMove = (e: React.MouseEvent | React.TouchEvent) => {
+    if (!previewRef.current) return;
+    const rect = previewRef.current.getBoundingClientRect();
+    const width = rect.width;
+    const height = rect.height;
+    
+    let clientX, clientY;
+    if ('touches' in e) {
+       clientX = e.touches[0].clientX;
+       clientY = e.touches[0].clientY;
+    } else {
+       clientX = (e as React.MouseEvent).clientX;
+       clientY = (e as React.MouseEvent).clientY;
+    }
+
+    const mouseX = clientX - rect.left;
+    const mouseY = clientY - rect.top;
+    
+    // Calculate rotation (Max 20 deg)
+    const xPct = mouseX / width - 0.5; 
+    const yPct = mouseY / height - 0.5;
+    const x = yPct * -20; 
+    const y = xPct * 20;
+    
+    setRotation({ x, y });
+  };
+
+  const handleEnter = () => setIsHovering(true);
+  
+  const handleLeave = () => {
+    setIsHovering(false);
+    setRotation({ x: 0, y: 0 });
+  };
 
   // --- Image Processing Helper ---
   const processImage = (file: File): Promise<string> => {
@@ -50,7 +106,6 @@ export const StarForm: React.FC<StarFormProps> = ({
           let width = img.width;
           let height = img.height;
           
-          // Max dimension 1200px to preserve LocalStorage space while keeping high quality
           const MAX_DIM = 1200;
           if (width > height) {
             if (width > MAX_DIM) {
@@ -72,12 +127,10 @@ export const StarForm: React.FC<StarFormProps> = ({
             return;
           }
           
-          // Smooth scaling
           ctx.imageSmoothingEnabled = true;
           ctx.imageSmoothingQuality = 'high';
           ctx.drawImage(img, 0, 0, width, height);
           
-          // Compress to JPEG 0.85
           resolve(canvas.toDataURL('image/jpeg', 0.85));
         };
         img.onerror = () => reject(new Error("Failed to load image"));
@@ -92,19 +145,19 @@ export const StarForm: React.FC<StarFormProps> = ({
     const file = e.target.files?.[0]; 
     if (!file) return;
 
-    if ((formData.images?.length || 0) >= MAX_IMAGES) {
+    if (imageCount >= MAX_IMAGES) {
        showToast(`Limit reached. Maximum ${MAX_IMAGES} images per star.`, 'error');
        return;
     }
 
-    const maxSize = 5 * 1024 * 1024; // 5MB in bytes
+    const maxSize = 5 * 1024 * 1024; // 5MB
     if (file.size > maxSize) {
       showToast("Image too large. Max limit is 5MB.", 'error');
       return;
     }
 
     if (!file.type.startsWith('image/')) {
-      showToast("Invalid file type. Please upload an image.", 'error');
+      showToast("Invalid file type.", 'error');
       return;
     }
 
@@ -112,14 +165,16 @@ export const StarForm: React.FC<StarFormProps> = ({
       showToast("Processing high-res image...", 'info');
       const optimizedImage = await processImage(file);
       
+      const newItem = createGalleryItem(optimizedImage);
+
       setFormData(prev => ({
         ...prev, 
-        images: [optimizedImage, ...(prev.images || [])],
-        // Reset cutout when new main image is added (unless we support multiple cutouts later)
-        imageCutout: undefined 
+        gallery: [...(prev.gallery || []), newItem]
       }));
-      setActiveImageIndex(0);
-      showToast("Image added successfully.", 'success');
+
+      // Switch to new image
+      setActiveGalleryIndex(imageCount);
+      showToast("Image added to gallery.", 'success');
     } catch (error) {
       console.error(error);
       showToast("Failed to process image.", 'error');
@@ -128,6 +183,11 @@ export const StarForm: React.FC<StarFormProps> = ({
 
   const handleGenerate3D = async () => {
     if (!mainImg) return;
+    
+    if (currentCutout && !confirm("Regenerate 3D Cutout? This will replace the current hologram.")) {
+        return;
+    }
+
     setProcessing3D(true);
     setProgress3D(0);
     setStatusMessage('Initializing Neural Net...');
@@ -137,7 +197,15 @@ export const StarForm: React.FC<StarFormProps> = ({
         setStatusMessage(msg);
         setProgress3D(p);
       });
-      setFormData(prev => ({ ...prev, imageCutout: cutout }));
+      
+      setFormData(prev => {
+         const newGallery = [...(prev.gallery || [])];
+         if (newGallery[activeGalleryIndex]) {
+            newGallery[activeGalleryIndex] = { ...newGallery[activeGalleryIndex], cutout };
+         }
+         return { ...prev, gallery: newGallery };
+      });
+
       showToast("3D Hologram Generated!", 'success');
     } catch (error: any) {
       showToast(error.message || "Failed to generate 3D effect.", 'error');
@@ -146,11 +214,24 @@ export const StarForm: React.FC<StarFormProps> = ({
     }
   };
 
+  const handleRemoveCutout = () => {
+    if (confirm("Remove the 3D Hologram effect?")) {
+       setFormData(prev => {
+         const newGallery = [...(prev.gallery || [])];
+         if (newGallery[activeGalleryIndex]) {
+            newGallery[activeGalleryIndex] = { ...newGallery[activeGalleryIndex], cutout: null };
+         }
+         return { ...prev, gallery: newGallery };
+       });
+       showToast("Hologram removed.", 'info');
+    }
+  };
+
   const handleAutoBio = async () => {
     if (!formData.name) return;
     try {
       // @ts-ignore
-      const data = await generateBio(apiKey, formData.name, formData.nickname || '', formData.tags || [], formData.images?.[0]);
+      const data = await generateBio(apiKey, formData.name, formData.nickname || '', formData.tags || [], gallery[0]?.url);
       setFormData(prev => ({ 
         ...prev, 
         bio: data.bio,
@@ -175,52 +256,57 @@ export const StarForm: React.FC<StarFormProps> = ({
   const handleDeleteActiveImage = (e: React.MouseEvent) => {
      if (e) { e.stopPropagation(); e.preventDefault(); }
      
-     if (!formData.images || formData.images.length === 0) {
-         showToast("No images to delete.", 'error');
-         return;
-     }
+     if (imageCount === 0) return;
 
-     if (confirm('Delete this image?')) {
-        const newImages = formData.images.filter((_, i) => i !== activeImageIndex);
-        setFormData(p => ({
-            ...p, 
-            images: newImages,
-            // If we deleted the main image, remove the cutout too as it won't match
-            imageCutout: activeImageIndex === 0 ? undefined : p.imageCutout 
-        }));
-        setActiveImageIndex(0); 
-        showToast("Discarded. Click SAVE below to apply.", 'info');
+     if (confirm('Delete this image and its 3D data?')) {
+        const newGallery = gallery.filter((_, i) => i !== activeGalleryIndex);
+        setFormData(p => ({ ...p, gallery: newGallery }));
+        setActiveGalleryIndex(0); 
+        showToast("Image deleted.", 'info');
      }
   };
 
   const handleSetCover = (e: React.MouseEvent) => {
      if (e) { e.stopPropagation(); e.preventDefault(); }
-     if (!formData.images || formData.images.length < 2) return;
-     const img = formData.images[activeImageIndex];
-     const others = formData.images.filter((_, i) => i !== activeImageIndex);
-     setFormData(p => ({
-         ...p, 
-         images: [img, ...others],
-         imageCutout: undefined // Reset cutout because cover changed
-     }));
-     setActiveImageIndex(0);
-     showToast("Cover changed. Re-generate 3D if needed.", 'info');
+     if (imageCount < 2) return;
+     
+     // Move current index to 0
+     const item = gallery[activeGalleryIndex];
+     const others = gallery.filter((_, i) => i !== activeGalleryIndex);
+     
+     setFormData(p => ({ ...p, gallery: [item, ...others] }));
+     setActiveGalleryIndex(0);
+     showToast("Cover changed.", 'info');
+  };
+
+  const handleAIImageGenerated = (url: string) => {
+      const newItem = createGalleryItem(url);
+      setFormData(prev => ({
+        ...prev, 
+        gallery: [newItem, ...(prev.gallery || [])] // Prepend AI images as new cover usually
+      }));
+      setActiveGalleryIndex(0);
   };
 
   const handleDeleteStar = (e?: React.MouseEvent) => {
     if (e) { e.stopPropagation(); e.preventDefault(); }
     const idToDelete = formData.id;
-    if (!idToDelete) {
-        showToast("Error: No Star ID found.", 'error');
-        return;
-    }
+    if (!idToDelete) return;
     onDelete(idToDelete);
   };
 
   return (
     <div className="fixed inset-0 z-50 bg-black animate-in slide-in-from-bottom duration-500">
+      <style>
+        {`
+          @keyframes float-hologram {
+            0%, 100% { transform: scale(1.0) translateY(-2%) translateZ(40px); }
+            50% { transform: scale(1.0) translateY(-5%) translateZ(40px); }
+          }
+        `}
+      </style>
       
-      {/* Background with Perfect Scaling */}
+      {/* Background */}
       {mainImg ? (
          <div className="fixed inset-0 z-0">
            <img 
@@ -274,84 +360,133 @@ export const StarForm: React.FC<StarFormProps> = ({
 
       {/* Content */}
       <div className="absolute inset-0 z-10 overflow-y-auto no-scrollbar">
-         {/* Main Image Preview Area */}
-         <div className="w-full h-[55vh] relative flex items-center justify-center p-6">
+         
+         {/* HOLOGRAPHIC WORKBENCH PREVIEW AREA */}
+         <div className="w-full h-[55vh] relative flex items-center justify-center p-6" style={{ perspective: '1000px' }}>
             {mainImg && (
-              <div className="relative w-full h-full max-w-lg shadow-[0_20px_50px_rgba(0,0,0,0.5)] rounded-3xl overflow-hidden border border-white/10 group">
-                <img 
-                  src={mainImg} 
-                  className="w-full h-full object-contain bg-black/20" 
-                  alt="Main Preview" 
-                />
+              <div 
+                 ref={previewRef}
+                 className="relative w-full h-full max-w-lg transition-transform duration-100 ease-out"
+                 style={{ 
+                    transformStyle: 'preserve-3d',
+                    transform: `rotateX(${rotation.x}deg) rotateY(${rotation.y}deg)`
+                 }}
+                 onMouseMove={handleMove}
+                 onMouseEnter={handleEnter}
+                 onMouseLeave={handleLeave}
+                 onTouchStart={handleEnter}
+                 onTouchMove={handleMove}
+                 onTouchEnd={handleLeave}
+              >
+                {/* Layer 1: Base Card */}
+                <div 
+                   className="absolute inset-0 shadow-[0_20px_50px_rgba(0,0,0,0.5)] rounded-3xl overflow-hidden border border-white/10 bg-black/20"
+                   style={{ transform: 'translateZ(0)' }}
+                >
+                  <img 
+                    src={mainImg} 
+                    className={`w-full h-full object-contain transition-opacity duration-300 ${currentCutout ? 'opacity-80 blur-[2px]' : 'opacity-100'}`} 
+                    alt="Main Preview" 
+                  />
+                  
+                  {/* Glare */}
+                  <div 
+                    className="absolute inset-0 pointer-events-none mix-blend-overlay transition-opacity duration-300"
+                    style={{
+                      background: `linear-gradient(${115 + rotation.y * 2}deg, transparent 20%, rgba(255,255,255,0.2) 50%, transparent 80%)`,
+                      opacity: isHovering ? 1 : 0
+                    }}
+                  />
+                </div>
                 
-                {/* 3D Cutout Overlay Preview (if generated) */}
-                {formData.imageCutout && activeImageIndex === 0 && (
-                   <img 
-                      src={formData.imageCutout} 
-                      className="absolute inset-0 w-full h-full object-contain pointer-events-none z-10 animate-pulse"
-                      style={{ filter: 'drop-shadow(0 0 10px rgba(225,29,72,0.5))' }}
-                      alt="3D Cutout"
-                   />
+                {/* Layer 2: 3D Cutout */}
+                {currentCutout && (
+                   <div 
+                     className="absolute inset-0 pointer-events-none z-10"
+                     style={{ transform: 'translateZ(50px)' }}
+                   >
+                     <img 
+                        src={currentCutout} 
+                        className="w-full h-full object-contain"
+                        style={{ 
+                          filter: isHovering ? 'drop-shadow(0 15px 30px rgba(0,0,0,0.7)) brightness(1.1)' : 'drop-shadow(0 10px 20px rgba(0,0,0,0.5))',
+                          animation: 'float-hologram 6s ease-in-out infinite'
+                        }}
+                        alt="3D Cutout"
+                     />
+                   </div>
                 )}
 
-                {/* 3D Generation Progress Overlay */}
+                {/* Layer 3: Loading */}
                 {processing3D && (
-                   <div className="absolute inset-0 bg-black/80 backdrop-blur-md flex flex-col items-center justify-center z-20 p-6 text-center">
+                   <div 
+                     className="absolute inset-0 bg-black/80 backdrop-blur-md flex flex-col items-center justify-center z-20 p-6 text-center rounded-3xl"
+                     style={{ transform: 'translateZ(60px)' }}
+                   >
                       <div className="relative mb-4">
                         <Loader2 className="animate-spin text-rose-500" size={40} />
                         <div className="absolute inset-0 animate-pulse bg-rose-500/20 blur-xl rounded-full"></div>
                       </div>
                       <p className="text-white text-xs font-bold uppercase tracking-widest mb-1">Engaging Neural Net</p>
-                      
                       <div className="w-48 h-1.5 bg-white/10 rounded-full overflow-hidden mb-3">
                          <div className="h-full bg-gradient-to-r from-rose-600 to-purple-600 transition-all duration-300" style={{ width: `${progress3D}%` }} />
                       </div>
-                      
                       <p className="text-rose-200/80 text-[10px] font-mono animate-pulse">{statusMessage}</p>
-                      
-                      {/* Helper text only if downloading */}
-                      {statusMessage.includes('Download') && (
-                        <p className="text-stone-500 text-[9px] mt-4 max-w-[200px]">
-                           First run requires downloading AI models (~40MB). This happens only once.
-                        </p>
-                      )}
                    </div>
                 )}
               </div>
             )}
 
+            {/* Controls */}
             <div className="absolute bottom-6 right-6 flex gap-2 z-[60]">
-               {/* 3D Generator Button */}
-               {activeImageIndex === 0 && mainImg && (
+               
+               {currentCutout && !processing3D && (
+                  <button 
+                    type="button"
+                    onClick={handleRemoveCutout}
+                    className="p-3 rounded-full backdrop-blur-md transition-all shadow-lg border border-white/10 bg-black/40 text-stone-400 hover:text-white hover:bg-red-500/20"
+                    title="Remove Hologram"
+                  >
+                    <Eraser size={18} />
+                  </button>
+               )}
+
+               {mainImg && (
                   <button
                     type="button"
                     onClick={handleGenerate3D}
                     disabled={processing3D}
-                    className={`p-3 rounded-full backdrop-blur-md transition-all shadow-lg border border-white/10 ${formData.imageCutout ? 'bg-purple-600 text-white shadow-[0_0_15px_rgba(147,51,234,0.5)]' : 'bg-black/60 text-purple-400 hover:bg-purple-900/80 hover:text-white'}`}
-                    title={formData.imageCutout ? "Regenerate 3D Cutout" : "Generate 3D Cutout"}
+                    className={`p-3 rounded-full backdrop-blur-md transition-all shadow-lg border border-white/10 ${
+                        currentCutout 
+                        ? 'bg-white/10 text-stone-400 hover:bg-white/20 hover:text-white'
+                        : 'bg-purple-600 text-white shadow-[0_0_15px_rgba(147,51,234,0.5)] hover:bg-purple-500'
+                    }`}
+                    title={currentCutout ? "Regenerate 3D" : "Generate 3D"}
                   >
-                     <Box size={20} className={processing3D ? 'animate-pulse' : ''} />
+                     {processing3D ? <Loader2 size={20} className="animate-spin" /> : currentCutout ? <RefreshCw size={18} /> : <Box size={20} />}
                   </button>
                )}
 
                <button 
                  type="button"
-                 onClick={(e) => handleDeleteActiveImage(e)} 
+                 onClick={handleDeleteActiveImage} 
                  className="p-3 bg-black/60 text-rose-400 rounded-full hover:bg-rose-900/80 backdrop-blur-md transition-all shadow-lg border border-white/10" 
                  title="Delete Image"
                >
                  <Trash2 size={20} className="pointer-events-none" />
                </button>
-               {activeImageIndex > 0 && (
+               
+               {activeGalleryIndex > 0 && (
                   <button 
                     type="button"
-                    onClick={(e) => handleSetCover(e)} 
+                    onClick={handleSetCover} 
                     className="p-3 bg-black/60 text-white rounded-full hover:bg-white/20 backdrop-blur-md transition-all shadow-lg border border-white/10" 
                     title="Make Cover"
                   >
                      <Layout size={20} className="pointer-events-none" />
                   </button>
                )}
+
                <label className={`p-3 rounded-full cursor-pointer shadow-lg hover:scale-110 transition-transform backdrop-blur-sm border border-white/10 ${imageCount >= MAX_IMAGES ? 'bg-stone-700 opacity-50 cursor-not-allowed' : 'bg-rose-600/90'}`}>
                   <Upload size={20} className="text-white pointer-events-none"/>
                   <input type="file" className="hidden" accept="image/*" onChange={handleFileChange} disabled={imageCount >= MAX_IMAGES} />
@@ -359,6 +494,7 @@ export const StarForm: React.FC<StarFormProps> = ({
             </div>
          </div>
 
+         {/* Form Body */}
          <div className="min-h-[60vh] bg-black/60 backdrop-blur-xl border-t border-white/10 rounded-t-[2.5rem] p-6 pb-32 shadow-[0_-10px_60px_rgba(0,0,0,0.7)]">
            <div className="flex justify-between items-center -mt-10 mb-4 px-2">
               <span className="text-[10px] uppercase font-bold text-stone-400 tracking-widest">
@@ -366,12 +502,13 @@ export const StarForm: React.FC<StarFormProps> = ({
               </span>
            </div>
            
-           {formData.images && formData.images.length > 0 && (
+           {gallery.length > 0 && (
              <div className="mb-6 flex gap-3 overflow-x-auto no-scrollbar py-2 px-2">
-                {formData.images.map((img, i) => (
-                  <button key={i} onClick={() => setActiveImageIndex(i)} className={`w-14 h-14 rounded-xl border-2 flex-shrink-0 overflow-hidden transition-all shadow-lg ${i === activeImageIndex ? 'border-rose-500 scale-110 z-10' : 'border-white/20 grayscale'} ${i===0 ? 'relative' : ''}`}>
-                    <img src={img} className="w-full h-full object-cover" />
+                {gallery.map((item, i) => (
+                  <button key={item.id} onClick={() => setActiveGalleryIndex(i)} className={`w-14 h-14 rounded-xl border-2 flex-shrink-0 overflow-hidden transition-all shadow-lg relative ${i === activeGalleryIndex ? 'border-rose-500 scale-110 z-10' : 'border-white/20 grayscale'} ${i===0 ? 'relative' : ''}`}>
+                    <img src={item.url} className="w-full h-full object-cover" />
                     {i === 0 && <div className="absolute bottom-0 left-0 w-full bg-rose-600 text-[8px] text-white text-center font-bold">COVER</div>}
+                    {item.cutout && <div className="absolute top-1 right-1 w-2 h-2 rounded-full bg-purple-500 ring-1 ring-black" />}
                   </button>
                 ))}
              </div>
@@ -405,7 +542,7 @@ export const StarForm: React.FC<StarFormProps> = ({
                 />
              </div>
 
-             {/* Streak Button */}
+             {/* Streak */}
              {mode === 'update' && (
                 <div className="flex justify-start">
                    <button 
@@ -419,7 +556,6 @@ export const StarForm: React.FC<StarFormProps> = ({
                          <p className="text-[10px] uppercase font-bold text-orange-300 tracking-wider">Streak</p>
                          <p className="text-xl font-serif text-white leading-none">{streak} <span className="text-xs font-sans text-white/50">Days</span></p>
                       </div>
-                      <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />
                    </button>
                 </div>
              )}
@@ -455,7 +591,7 @@ export const StarForm: React.FC<StarFormProps> = ({
                   <AIGenerator 
                     apiKey={apiKey} 
                     description={formData.bio} 
-                    onImageGenerated={(u) => setFormData(p=>({...p, images: [u, ...(p.images||[])]}))} 
+                    onImageGenerated={handleAIImageGenerated} 
                     onRequestKey={onRequestKey} 
                   />
                </div>

@@ -18,6 +18,19 @@ import { SettingsModal } from './src/components/SettingsModal';
 import { XPModal } from './src/components/XPModal';
 import { ThreeCursorTrail } from './src/components/ThreeCursorTrail';
 
+// --- Helper: UUID Generator ---
+// Ensures compatibility with UUID database columns
+const generateId = () => {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+};
+
 const AppContent: React.FC = () => {
   const { user, loading: authLoading } = useAuth();
   
@@ -48,8 +61,24 @@ const AppContent: React.FC = () => {
 
   useEffect(() => {
     loadData();
+    // Prioritize local override, then env var
     const storedKey = localStorage.getItem('gemini_api_key');
-    if (storedKey) setApiKey(storedKey);
+    let envKey = '';
+    
+    try {
+      // Safely access env var
+      if (typeof import.meta !== 'undefined' && (import.meta as any).env) {
+        envKey = (import.meta as any).env.VITE_GEMINI_API_KEY || '';
+      }
+    } catch (e) {
+      // Ignore env error
+    }
+    
+    if (storedKey) {
+      setApiKey(storedKey);
+    } else if (envKey) {
+      setApiKey(envKey);
+    }
   }, [user]);
 
   const handleSaveKey = (key: string) => { 
@@ -64,12 +93,16 @@ const AppContent: React.FC = () => {
     if (!data.name) return;
     setDataLoading(true);
     const newStar: Star = {
-      id: Date.now().toString(),
+      id: generateId(),
       name: data.name,
       nickname: data.nickname || '',
-      images: data.images || [],
+      // New: Use Gallery
       gallery: data.gallery || [],
-      imageCutout: data.imageCutout,
+      
+      // Deprecated fields kept empty
+      images: [],
+      imageCutout: undefined,
+
       xp: 0,
       logs: [],
       tags: data.tags || [],
@@ -88,7 +121,7 @@ const AppContent: React.FC = () => {
       setView('dashboard');
       showToast("Star added to Cloud.", 'success');
     } catch (e) {
-      showToast("Save failed.", 'error');
+      showToast("Save failed. Check console.", 'error');
     } finally {
       setDataLoading(false);
     }
@@ -143,7 +176,13 @@ const AppContent: React.FC = () => {
         newStreak = (lastActive === yesterdayStr) ? newStreak + 1 : 1;
       }
 
-      const newLog: XPLog = { id: Date.now().toString(), date: new Date().toISOString(), amount, note };
+      const newLog: XPLog = { 
+        id: generateId(),
+        date: new Date().toISOString(), 
+        amount, 
+        note 
+      };
+      
       const updatedStar = { 
         ...star, 
         xp: star.xp + amount, 

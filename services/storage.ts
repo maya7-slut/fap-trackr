@@ -11,6 +11,14 @@ const defaultStars: Star[] = [
     // Using high quality generic placeholders. 
     // In a real scenario, the user would upload real Base64 images.
     images: ['https://images.unsplash.com/photo-1616091093747-478045110903?q=80&w=600&auto=format&fit=crop'], 
+    gallery: [
+      {
+        id: 'seed-g1',
+        url: 'https://images.unsplash.com/photo-1616091093747-478045110903?q=80&w=600&auto=format&fit=crop',
+        cutout: null,
+        dateAdded: new Date().toISOString()
+      }
+    ],
     xp: 100,
     logs: [
        { id: 'l1', date: new Date().toISOString(), amount: 100, note: "Initial worship" }
@@ -28,6 +36,14 @@ const defaultStars: Star[] = [
     name: 'Alia Bhatt',
     nickname: 'Aloo',
     images: ['https://images.unsplash.com/photo-1621784563330-caee0b138a00?q=80&w=600&auto=format&fit=crop'],
+    gallery: [
+      {
+        id: 'seed-g2',
+        url: 'https://images.unsplash.com/photo-1621784563330-caee0b138a00?q=80&w=600&auto=format&fit=crop',
+        cutout: null,
+        dateAdded: new Date().toISOString()
+      }
+    ],
     xp: 10,
     logs: [
        { id: 'l2', date: new Date().toISOString(), amount: 10, note: "Quick spark" }

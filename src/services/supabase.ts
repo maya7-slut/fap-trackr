@@ -1,8 +1,21 @@
 import { createClient } from '@supabase/supabase-js';
 
-// Configuration provided by the user
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+// Helper to safely get env vars without crashing
+const getEnvVar = (key: string): string | undefined => {
+  try {
+    // Check if import.meta and import.meta.env exist
+    if (typeof import.meta !== 'undefined' && (import.meta as any).env) {
+      return (import.meta as any).env[key];
+    }
+  } catch (e) {
+    // Ignore errors in environments where import.meta is not supported
+  }
+  return undefined;
+};
+
+// Strictly read from environment - NO HARDCODED FALLBACKS
+const supabaseUrl = getEnvVar('VITE_SUPABASE_URL');
+const supabaseAnonKey = getEnvVar('VITE_SUPABASE_PUBLISHABLE_KEY');
 
 // Check if configuration exists
 export const isSupabaseConfigured = !!(supabaseUrl && supabaseAnonKey && supabaseUrl.startsWith('http'));
@@ -10,13 +23,11 @@ export const isSupabaseConfigured = !!(supabaseUrl && supabaseAnonKey && supabas
 // Debug logs
 if (isSupabaseConfigured) {
   console.log("[Supabase] Initializing client...");
-  console.log("[Supabase] Project URL:", supabaseUrl);
-  console.log("[Supabase] Key Length:", supabaseAnonKey?.length);
 } else {
-  console.error("[Supabase] MISSING CREDENTIALS. Check your environment variables.");
+  console.log("[Supabase] No credentials found. Running in local/guest mode.");
 }
 
-// Initialize client
+// Initialize client only if configured
 export const supabase = isSupabaseConfigured 
-  ? createClient(supabaseUrl, supabaseAnonKey) 
+  ? createClient(supabaseUrl!, supabaseAnonKey!) 
   : null as any;

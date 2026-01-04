@@ -1,3 +1,4 @@
+
 import React, { useState, useRef } from 'react';
 import { Plus, Image as ImageIcon, Flame, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Star, StarCategory } from '../../types';
@@ -23,9 +24,15 @@ export const StarCard: React.FC<StarCardProps> = ({ star, onAddXP, onClick }) =>
   const [rotation, setRotation] = useState({ x: 0, y: 0 });
   const [isHovering, setIsHovering] = useState(false);
 
-  const displayImage = star.images[currentIdx] || star.images[0];
-  const hasMultipleImages = star.images.length > 1;
-  const show3D = !!star.imageCutout && currentIdx === 0;
+  // Use Gallery
+  const gallery = star.gallery || [];
+  const currentItem = gallery[currentIdx] || gallery[0];
+  const displayImage = currentItem?.url;
+  const currentCutout = currentItem?.cutout;
+  const hasMultipleImages = gallery.length > 1;
+  
+  // Logic: Show 3D if setting enabled AND cutout exists for THIS image
+  const show3D = settings.enableHologram && !!currentCutout;
 
   // --- Dynamic Styling Helpers ---
   const getBorderClasses = (style: BorderStyle) => {
@@ -86,167 +93,175 @@ export const StarCard: React.FC<StarCardProps> = ({ star, onAddXP, onClick }) =>
 
   const handlePrev = (e: React.MouseEvent) => {
     e.stopPropagation();
-    setCurrentIdx(prev => (prev - 1 + star.images.length) % star.images.length);
+    setCurrentIdx(prev => (prev - 1 + gallery.length) % gallery.length);
   };
 
   const handleNext = (e: React.MouseEvent) => {
     e.stopPropagation();
-    setCurrentIdx(prev => (prev + 1) % star.images.length);
+    setCurrentIdx(prev => (prev + 1) % gallery.length);
   };
 
   return (
-    <div 
-      ref={cardRef}
-      className={`group relative w-full aspect-[3/4] cursor-pointer ${isHovering ? 'z-50' : 'z-0'} ${getRadiusClass(settings.cardShape)}`}
-      style={{ 
-        perspective: '1000px',
-        marginTop: `${settings.margins.top}px`,
-        marginBottom: `${settings.margins.bottom}px`,
-        marginLeft: `${settings.margins.left}px`,
-        marginRight: `${settings.margins.right}px`,
-      }}
-      onMouseMove={handleMove}
-      onMouseEnter={handleEnter}
-      onMouseLeave={handleLeave}
-      onTouchStart={handleEnter}
-      onTouchMove={handleMove}
-      onTouchEnd={handleLeave}
-      onClick={() => onClick(star)}
-    >
-      {/* 3D Container */}
+    <>
+      <style>
+        {`
+          @keyframes float-hologram {
+            0%, 100% { transform: scale(1.15) translateY(-5%) translateZ(40px); }
+            50% { transform: scale(1.15) translateY(-8%) translateZ(40px); }
+          }
+        `}
+      </style>
       <div 
-        className={`relative h-full w-full transition-all duration-100 ease-out preserve-3d ${getRadiusClass(settings.cardShape)}`}
-        style={{
-          transform: `rotateX(${rotation.x}deg) rotateY(${rotation.y}deg) scale3d(${isHovering ? 1.05 : 1}, ${isHovering ? 1.05 : 1}, 1)`,
-          transition: isHovering ? 'transform 0.1s ease-out' : 'transform 0.5s ease-out',
-          transformStyle: 'preserve-3d',
+        ref={cardRef}
+        className={`group relative w-full aspect-[3/4] cursor-pointer ${isHovering ? 'z-50' : 'z-0'} ${getRadiusClass(settings.cardShape)}`}
+        style={{ 
+          perspective: '1000px',
+          marginTop: `${settings.margins.top}px`,
+          marginBottom: `${settings.margins.bottom}px`,
+          marginLeft: `${settings.margins.left}px`,
+          marginRight: `${settings.margins.right}px`,
         }}
+        onMouseMove={handleMove}
+        onMouseEnter={handleEnter}
+        onMouseLeave={handleLeave}
+        onTouchStart={handleEnter}
+        onTouchMove={handleMove}
+        onTouchEnd={handleLeave}
+        onClick={() => onClick(star)}
       >
-        
-        {/* Shadow/Glow behind card */}
-        <div className={`absolute inset-0 transition-opacity duration-500 blur-xl bg-gradient-to-t from-rose-600 to-purple-600 ${getRadiusClass(settings.cardShape)} ${isHovering ? 'opacity-40' : 'opacity-0'}`} style={{ transform: 'translateZ(-10px)' }} />
-
-        {/* LAYER 1: BASE FRAME & BACKGROUND */}
-        <div className={`absolute inset-0 overflow-hidden bg-stone-900 ${getBorderClasses(settings.borderStyle)} ${getRadiusClass(settings.cardShape)}`} style={{ transform: 'translateZ(0)' }}>
-          {displayImage ? (
-            <img 
-              src={displayImage} 
-              alt={star.name} 
-              className={`absolute inset-0 w-full h-full object-cover object-top transition-transform duration-700 ${show3D ? 'opacity-80 blur-[2px]' : ''}`}
-              style={{ transform: isHovering && !show3D ? 'scale(1.1)' : 'scale(1)' }}
-            />
-          ) : (
-            <div className="absolute inset-0 bg-stone-900 flex items-center justify-center">
-              <ImageIcon className="text-stone-700 opacity-50" size={48} />
-            </div>
-          )}
-          <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent opacity-90" />
+        {/* 3D Container */}
+        <div 
+          className={`relative h-full w-full transition-all duration-100 ease-out preserve-3d ${getRadiusClass(settings.cardShape)}`}
+          style={{
+            transform: `rotateX(${rotation.x}deg) rotateY(${rotation.y}deg) scale3d(${isHovering ? 1.05 : 1}, ${isHovering ? 1.05 : 1}, 1)`,
+            transition: isHovering ? 'transform 0.1s ease-out' : 'transform 0.5s ease-out',
+            transformStyle: 'preserve-3d',
+          }}
+        >
           
-          {/* Subtle Glare Effect on Base */}
-          <div 
-            className="absolute inset-0 pointer-events-none mix-blend-overlay opacity-0 group-hover:opacity-100 transition-opacity duration-300"
-            style={{
-              background: `linear-gradient(${115 + rotation.y * 2}deg, transparent 20%, rgba(255,255,255,0.3) 50%, transparent 80%)`
-            }}
-          />
-        </div>
+          {/* Shadow/Glow behind card */}
+          <div className={`absolute inset-0 transition-opacity duration-500 blur-xl bg-gradient-to-t from-rose-600 to-purple-600 ${getRadiusClass(settings.cardShape)} ${isHovering ? 'opacity-40' : 'opacity-0'}`} style={{ transform: 'translateZ(-10px)' }} />
 
-        {/* LAYER 2: 3D POP-OUT CUTOUT */}
-        {show3D && (
-          <div 
-             className={`absolute inset-0 pointer-events-none overflow-visible ${getRadiusClass(settings.cardShape)}`}
-             style={{ transform: 'translateZ(40px)' }}
-          >
-             <img 
-               src={star.imageCutout}
-               className="w-full h-full object-cover object-top transition-transform duration-100"
-               style={{ 
-                  transform: 'scale(1.15) translateY(-5%)', 
-                  filter: 'drop-shadow(0 10px 20px rgba(0,0,0,0.5))',
-                  // Ensure bottom is masked if needed, though overflow-visible is set on parent for top pop-out.
-                  // Usually 3D cards allow pop out on top but bottom is clipped by container context visually if not careful.
-                  // Here we let it float.
-               }}
-               alt="3D Hologram"
-             />
-          </div>
-        )}
-
-        {/* LAYER 3: UI ELEMENTS */}
-        <div className="absolute inset-0 pointer-events-none" style={{ transform: 'translateZ(50px)' }}>
-          
-          {/* Carousel Controls */}
-          {hasMultipleImages && (
-            <div className="pointer-events-auto h-full w-full">
-              <button 
-                onClick={handlePrev}
-                className="absolute left-0 top-1/2 -translate-y-1/2 h-24 w-10 flex items-center justify-center z-30 text-white/30 hover:text-white transition-colors"
-              >
-                <ChevronLeft size={24} strokeWidth={3} className="drop-shadow-lg" />
-              </button>
-              <button 
-                onClick={handleNext}
-                className="absolute right-0 top-1/2 -translate-y-1/2 h-24 w-10 flex items-center justify-center z-30 text-white/30 hover:text-white transition-colors"
-              >
-                <ChevronRight size={24} strokeWidth={3} className="drop-shadow-lg" />
-              </button>
-            </div>
-          )}
-
-          {/* Indicators */}
-          {hasMultipleImages && (
-             <div className="absolute top-4 left-4 flex gap-1 z-20">
-                {star.images.map((_, i) => (
-                   <div key={i} className={`h-1 rounded-full transition-all duration-300 ${i === currentIdx ? 'w-4 bg-rose-500' : 'w-1 bg-white/30'}`} />
-                ))}
-             </div>
-          )}
-
-          {/* Streak Indicator */}
-          {streak > 1 && (
-            <div className="absolute top-12 left-4 z-20 flex items-center gap-1 animate-pulse">
-              <Flame size={14} className="text-orange-500 fill-orange-500" />
-              <span className="text-[10px] font-bold text-orange-200 drop-shadow-[0_0_5px_rgba(249,115,22,0.8)]">
-                {streak} Days
-              </span>
-            </div>
-          )}
-
-          {/* Category Badge */}
-          <div className="absolute top-4 right-4 z-10">
-             <span className={`text-[10px] font-bold px-2 py-1 rounded-full uppercase tracking-widest backdrop-blur-md border border-white/10 ${
-               category === StarCategory.Goddess ? 'bg-amber-500/20 text-amber-200' : 
-               category === StarCategory.Enchantress ? 'bg-purple-500/20 text-purple-200' : 
-               'bg-rose-500/20 text-rose-200'
-             }`}>
-               {category}
-             </span>
-          </div>
-
-          {/* Bottom Info */}
-          <div className="absolute bottom-0 w-full p-5 flex flex-col gap-1 z-10">
-            <h3 className="font-serif text-2xl font-bold text-white drop-shadow-md leading-none">{star.name}</h3>
-            {star.nickname && <p className="text-rose-300/80 text-sm font-medium tracking-wide">{star.nickname}</p>}
-            <div className="flex items-center gap-3 mt-3">
-              <div className="flex-1 h-1 bg-white/10 rounded-full overflow-hidden backdrop-blur-sm">
-                <div 
-                  className="h-full bg-gradient-to-r from-rose-500 to-amber-500 shadow-[0_0_15px_rgba(244,63,94,0.8)]" 
-                  style={{ width: `${Math.min((star.xp % 100) || 100, 100)}%` }} 
-                />
+          {/* LAYER 1: BASE FRAME & BACKGROUND */}
+          <div className={`absolute inset-0 overflow-hidden bg-stone-900 ${getBorderClasses(settings.borderStyle)} ${getRadiusClass(settings.cardShape)}`} style={{ transform: 'translateZ(0)' }}>
+            {displayImage ? (
+              <img 
+                src={displayImage} 
+                alt={star.name} 
+                className={`absolute inset-0 w-full h-full object-cover object-top transition-transform duration-700 ${show3D ? 'opacity-80 blur-[2px]' : ''}`}
+                style={{ transform: isHovering && !show3D ? 'scale(1.1)' : 'scale(1)' }}
+              />
+            ) : (
+              <div className="absolute inset-0 bg-stone-900 flex items-center justify-center">
+                <ImageIcon className="text-stone-700 opacity-50" size={48} />
               </div>
-              <span className="text-xs font-mono text-white/60">{star.xp} XP</span>
-            </div>
+            )}
+            <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent opacity-90" />
+            
+            {/* Subtle Glare Effect on Base */}
+            <div 
+              className="absolute inset-0 pointer-events-none mix-blend-overlay opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+              style={{
+                background: `linear-gradient(${115 + rotation.y * 2}deg, transparent 20%, rgba(255,255,255,0.3) 50%, transparent 80%)`
+              }}
+            />
           </div>
 
-          {/* Add XP Button */}
-          <button 
-            onClick={(e) => { e.stopPropagation(); onAddXP(star.id); }}
-            className="absolute bottom-4 right-4 w-12 h-12 rounded-full bg-rose-600/90 text-white flex items-center justify-center shadow-[0_0_20px_rgba(225,29,72,0.4)] hover:bg-rose-500 hover:scale-110 active:scale-90 transition-all z-20 pointer-events-auto"
-          >
-            <Plus size={24} strokeWidth={2.5} />
-          </button>
+          {/* LAYER 2: 3D POP-OUT CUTOUT */}
+          {show3D && (
+            <div 
+               className={`absolute inset-0 pointer-events-none overflow-visible ${getRadiusClass(settings.cardShape)}`}
+               style={{ transform: 'translateZ(40px)' }}
+            >
+               <img 
+                 src={currentCutout}
+                 className="w-full h-full object-cover object-top transition-transform duration-100"
+                 style={{ 
+                    // Base transform applied here, animation overrides/adds to it
+                    filter: isHovering ? 'drop-shadow(0 15px 30px rgba(0,0,0,0.7)) brightness(1.1)' : 'drop-shadow(0 10px 20px rgba(0,0,0,0.5))',
+                    animation: 'float-hologram 6s ease-in-out infinite'
+                 }}
+                 alt="3D Hologram"
+               />
+            </div>
+          )}
+
+          {/* LAYER 3: UI ELEMENTS */}
+          <div className="absolute inset-0 pointer-events-none" style={{ transform: 'translateZ(50px)' }}>
+            
+            {/* Carousel Controls */}
+            {hasMultipleImages && (
+              <div className="pointer-events-auto h-full w-full">
+                <button 
+                  onClick={handlePrev}
+                  className="absolute left-0 top-1/2 -translate-y-1/2 h-24 w-10 flex items-center justify-center z-30 text-white/30 hover:text-white transition-colors"
+                >
+                  <ChevronLeft size={24} strokeWidth={3} className="drop-shadow-lg" />
+                </button>
+                <button 
+                  onClick={handleNext}
+                  className="absolute right-0 top-1/2 -translate-y-1/2 h-24 w-10 flex items-center justify-center z-30 text-white/30 hover:text-white transition-colors"
+                >
+                  <ChevronRight size={24} strokeWidth={3} className="drop-shadow-lg" />
+                </button>
+              </div>
+            )}
+
+            {/* Indicators */}
+            {hasMultipleImages && (
+               <div className="absolute top-4 left-4 flex gap-1 z-20">
+                  {gallery.map((_, i) => (
+                     <div key={i} className={`h-1 rounded-full transition-all duration-300 ${i === currentIdx ? 'w-4 bg-rose-500' : 'w-1 bg-white/30'}`} />
+                  ))}
+               </div>
+            )}
+
+            {/* Streak Indicator */}
+            {streak > 1 && (
+              <div className="absolute top-12 left-4 z-20 flex items-center gap-1 animate-pulse">
+                <Flame size={14} className="text-orange-500 fill-orange-500" />
+                <span className="text-[10px] font-bold text-orange-200 drop-shadow-[0_0_5px_rgba(249,115,22,0.8)]">
+                  {streak} Days
+                </span>
+              </div>
+            )}
+
+            {/* Category Badge */}
+            <div className="absolute top-4 right-4 z-10">
+               <span className={`text-[10px] font-bold px-2 py-1 rounded-full uppercase tracking-widest backdrop-blur-md border border-white/10 ${
+                 category === StarCategory.Goddess ? 'bg-amber-500/20 text-amber-200' : 
+                 category === StarCategory.Enchantress ? 'bg-purple-500/20 text-purple-200' : 
+                 'bg-rose-500/20 text-rose-200'
+               }`}>
+                 {category}
+               </span>
+            </div>
+
+            {/* Bottom Info */}
+            <div className="absolute bottom-0 w-full p-5 flex flex-col gap-1 z-10">
+              <h3 className="font-serif text-2xl font-bold text-white drop-shadow-md leading-none">{star.name}</h3>
+              {star.nickname && <p className="text-rose-300/80 text-sm font-medium tracking-wide">{star.nickname}</p>}
+              <div className="flex items-center gap-3 mt-3">
+                <div className="flex-1 h-1 bg-white/10 rounded-full overflow-hidden backdrop-blur-sm">
+                  <div 
+                    className="h-full bg-gradient-to-r from-rose-500 to-amber-500 shadow-[0_0_15px_rgba(244,63,94,0.8)]" 
+                    style={{ width: `${Math.min((star.xp % 100) || 100, 100)}%` }} 
+                  />
+                </div>
+                <span className="text-xs font-mono text-white/60">{star.xp} XP</span>
+              </div>
+            </div>
+
+            {/* Add XP Button */}
+            <button 
+              onClick={(e) => { e.stopPropagation(); onAddXP(star.id); }}
+              className="absolute bottom-4 right-4 w-12 h-12 rounded-full bg-rose-600/90 text-white flex items-center justify-center shadow-[0_0_20px_rgba(225,29,72,0.4)] hover:bg-rose-500 hover:scale-110 active:scale-90 transition-all z-20 pointer-events-auto"
+            >
+              <Plus size={24} strokeWidth={2.5} />
+            </button>
+          </div>
         </div>
       </div>
-    </div>
+    </>
   );
 };

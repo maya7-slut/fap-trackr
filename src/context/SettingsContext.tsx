@@ -7,6 +7,7 @@ interface LayoutSettings {
   margins: { top: number; bottom: number; left: number; right: number };
   borderStyle: BorderStyle;
   cardShape: CardShape;
+  enableHologram: boolean; // New Setting
 }
 
 interface SettingsContextType {
@@ -18,7 +19,8 @@ interface SettingsContextType {
 const defaultSettings: LayoutSettings = {
   margins: { top: 0, bottom: 0, left: 0, right: 0 },
   borderStyle: 'glass',
-  cardShape: 'rectangle'
+  cardShape: 'rectangle',
+  enableHologram: true // Enabled by default
 };
 
 const SettingsContext = createContext<SettingsContextType | undefined>(undefined);
