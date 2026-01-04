@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 
 export type BorderStyle = 'glass' | 'neon' | 'glow' | 'gold' | 'minimal';
@@ -7,7 +8,8 @@ interface LayoutSettings {
   margins: { top: number; bottom: number; left: number; right: number };
   borderStyle: BorderStyle;
   cardShape: CardShape;
-  enableHologram: boolean; // New Setting
+  enableHologram: boolean;
+  enableAI: boolean; // New Setting
 }
 
 interface SettingsContextType {
@@ -20,7 +22,8 @@ const defaultSettings: LayoutSettings = {
   margins: { top: 0, bottom: 0, left: 0, right: 0 },
   borderStyle: 'glass',
   cardShape: 'rectangle',
-  enableHologram: true // Enabled by default
+  enableHologram: true,
+  enableAI: false // Default to Hidden
 };
 
 const SettingsContext = createContext<SettingsContextType | undefined>(undefined);

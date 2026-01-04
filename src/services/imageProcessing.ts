@@ -1,3 +1,4 @@
+
 import { removeBackground } from "@imgly/background-removal";
 
 // Configuration for the removal tool
@@ -33,7 +34,6 @@ const dataURItoBlob = (dataURI: string): Blob => {
 
 // --- Helper: Downscale Blob (Performance Optimization) ---
 // Resizes large images to a manageable size (maxDim) BEFORE AI processing.
-// This prevents browser crashes on mobile when processing 12MP+ photos.
 const downscaleBlob = (blob: Blob, maxDim: number): Promise<Blob> => {
     return new Promise((resolve, reject) => {
         const reader = new FileReader();
@@ -120,7 +120,53 @@ const resizeImageBlob = (blob: Blob, maxHeight: number): Promise<string> => {
   });
 };
 
-// --- Main Function ---
+// --- Public: Process Uploaded Image (Client Side Optimization) ---
+export const processUploadedImage = (file: File): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let width = img.width;
+        let height = img.height;
+        
+        const MAX_DIM = 1200;
+        if (width > height) {
+          if (width > MAX_DIM) {
+            height *= MAX_DIM / width;
+            width = MAX_DIM;
+          }
+        } else {
+          if (height > MAX_DIM) {
+            width *= MAX_DIM / height;
+            height = MAX_DIM;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          reject(new Error("Canvas context failed"));
+          return;
+        }
+        
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+        ctx.drawImage(img, 0, 0, width, height);
+        
+        resolve(canvas.toDataURL('image/jpeg', 0.85));
+      };
+      img.onerror = () => reject(new Error("Failed to load image"));
+      img.src = event.target?.result as string;
+    };
+    reader.onerror = () => reject(new Error("Failed to read file"));
+    reader.readAsDataURL(file);
+  });
+};
+
+// --- Main Function: Generate Cutout ---
 export const generateCutout = async (
   imageSource: string, 
   onProgress?: (message: string, progress: number) => void

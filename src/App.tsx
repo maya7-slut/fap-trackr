@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { LayoutGrid, Plus, BarChart2, Loader2 } from 'lucide-react';
 import { Star, XPLog } from './types';
@@ -93,7 +94,7 @@ const AppContent: React.FC = () => {
     if (!data.name) return;
     setDataLoading(true);
     const newStar: Star = {
-      id: generateId(),
+      id: generateId(), // FIXED: Now uses UUID instead of Date.now()
       name: data.name,
       nickname: data.nickname || '',
       // New: Use Gallery
@@ -177,7 +178,7 @@ const AppContent: React.FC = () => {
       }
 
       const newLog: XPLog = { 
-        id: generateId(),
+        id: generateId(), // FIXED: Now uses UUID
         date: new Date().toISOString(), 
         amount, 
         note 

@@ -1,6 +1,6 @@
 
 import React, { useState, useRef } from 'react';
-import { Plus, Image as ImageIcon, Flame, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Plus, Image as ImageIcon, Flame, ChevronLeft, ChevronRight, Check } from 'lucide-react';
 import { Star, StarCategory } from '../../types';
 import { getCategory } from '../../constants';
 import { useCursor } from '../context/CursorContext';
@@ -10,9 +10,16 @@ interface StarCardProps {
   star: Star; 
   onAddXP: (id: string) => void; 
   onClick: (star: Star) => void; 
+  
+  // Selection Mode Props
+  isSelectionMode?: boolean;
+  isSelected?: boolean;
+  onToggleSelect?: (id: string) => void;
 }
 
-export const StarCard: React.FC<StarCardProps> = ({ star, onAddXP, onClick }) => {
+export const StarCard: React.FC<StarCardProps> = ({ 
+  star, onAddXP, onClick, isSelectionMode = false, isSelected = false, onToggleSelect 
+}) => {
   const category = getCategory(star.xp);
   const [currentIdx, setCurrentIdx] = useState(0);
   const streak = star.streak || 0;
@@ -31,8 +38,8 @@ export const StarCard: React.FC<StarCardProps> = ({ star, onAddXP, onClick }) =>
   const currentCutout = currentItem?.cutout;
   const hasMultipleImages = gallery.length > 1;
   
-  // Logic: Show 3D if setting enabled AND cutout exists for THIS image
-  const show3D = settings.enableHologram && !!currentCutout;
+  // Logic: Show 3D if setting enabled AND cutout exists for THIS image AND not in selection mode
+  const show3D = settings.enableHologram && !!currentCutout && !isSelectionMode;
 
   // --- Dynamic Styling Helpers ---
   const getBorderClasses = (style: BorderStyle) => {
@@ -50,7 +57,7 @@ export const StarCard: React.FC<StarCardProps> = ({ star, onAddXP, onClick }) =>
   };
 
   const handleMove = (e: React.MouseEvent | React.TouchEvent) => {
-    if (!cardRef.current) return;
+    if (isSelectionMode || !cardRef.current) return; // Disable tilt in selection mode
     
     const rect = cardRef.current.getBoundingClientRect();
     let clientX, clientY;
@@ -66,14 +73,12 @@ export const StarCard: React.FC<StarCardProps> = ({ star, onAddXP, onClick }) =>
     const width = rect.width;
     const height = rect.height;
     
-    // Calculate position relative to center
     const mouseX = clientX - rect.left;
     const mouseY = clientY - rect.top;
 
     const xPct = mouseX / width - 0.5; 
     const yPct = mouseY / height - 0.5;
 
-    // Calculate rotation (Max 15 deg)
     const x = yPct * -20; 
     const y = xPct * 20;
     
@@ -81,6 +86,7 @@ export const StarCard: React.FC<StarCardProps> = ({ star, onAddXP, onClick }) =>
   };
 
   const handleEnter = () => {
+    if (isSelectionMode) return;
     setIsHovering(true);
     setVariant('hot');
   };
@@ -89,6 +95,16 @@ export const StarCard: React.FC<StarCardProps> = ({ star, onAddXP, onClick }) =>
     setIsHovering(false);
     setRotation({ x: 0, y: 0 });
     setVariant('default');
+  };
+
+  const handleClick = (e: React.MouseEvent) => {
+    if (isSelectionMode && onToggleSelect) {
+      e.preventDefault();
+      e.stopPropagation();
+      onToggleSelect(star.id);
+    } else {
+      onClick(star);
+    }
   };
 
   const handlePrev = (e: React.MouseEvent) => {
@@ -113,7 +129,7 @@ export const StarCard: React.FC<StarCardProps> = ({ star, onAddXP, onClick }) =>
       </style>
       <div 
         ref={cardRef}
-        className={`group relative w-full aspect-[3/4] cursor-pointer ${isHovering ? 'z-50' : 'z-0'} ${getRadiusClass(settings.cardShape)}`}
+        className={`group relative w-full aspect-[3/4] cursor-pointer ${isHovering ? 'z-50' : 'z-0'} ${getRadiusClass(settings.cardShape)} transition-all duration-300 ${isSelectionMode && !isSelected ? 'opacity-50 scale-95 grayscale' : ''} ${isSelected ? 'ring-4 ring-rose-500 scale-100 opacity-100' : ''}`}
         style={{ 
           perspective: '1000px',
           marginTop: `${settings.margins.top}px`,
@@ -127,8 +143,17 @@ export const StarCard: React.FC<StarCardProps> = ({ star, onAddXP, onClick }) =>
         onTouchStart={handleEnter}
         onTouchMove={handleMove}
         onTouchEnd={handleLeave}
-        onClick={() => onClick(star)}
+        onClick={handleClick}
       >
+        {/* Selection Checkbox Overlay */}
+        {isSelectionMode && (
+          <div className="absolute top-4 left-4 z-[60] pointer-events-none">
+            <div className={`w-8 h-8 rounded-full border-2 flex items-center justify-center transition-all ${isSelected ? 'bg-rose-500 border-rose-500 shadow-lg' : 'bg-black/50 border-white/30'}`}>
+              {isSelected && <Check size={18} className="text-white" strokeWidth={3} />}
+            </div>
+          </div>
+        )}
+
         {/* 3D Container */}
         <div 
           className={`relative h-full w-full transition-all duration-100 ease-out preserve-3d ${getRadiusClass(settings.cardShape)}`}
@@ -140,7 +165,7 @@ export const StarCard: React.FC<StarCardProps> = ({ star, onAddXP, onClick }) =>
         >
           
           {/* Shadow/Glow behind card */}
-          <div className={`absolute inset-0 transition-opacity duration-500 blur-xl bg-gradient-to-t from-rose-600 to-purple-600 ${getRadiusClass(settings.cardShape)} ${isHovering ? 'opacity-40' : 'opacity-0'}`} style={{ transform: 'translateZ(-10px)' }} />
+          <div className={`absolute inset-0 transition-opacity duration-500 blur-xl bg-gradient-to-t from-rose-600 to-purple-600 ${getRadiusClass(settings.cardShape)} ${isHovering && !isSelectionMode ? 'opacity-40' : 'opacity-0'}`} style={{ transform: 'translateZ(-10px)' }} />
 
           {/* LAYER 1: BASE FRAME & BACKGROUND */}
           <div className={`absolute inset-0 overflow-hidden bg-stone-900 ${getBorderClasses(settings.borderStyle)} ${getRadiusClass(settings.cardShape)}`} style={{ transform: 'translateZ(0)' }}>
@@ -159,12 +184,14 @@ export const StarCard: React.FC<StarCardProps> = ({ star, onAddXP, onClick }) =>
             <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent opacity-90" />
             
             {/* Subtle Glare Effect on Base */}
-            <div 
-              className="absolute inset-0 pointer-events-none mix-blend-overlay opacity-0 group-hover:opacity-100 transition-opacity duration-300"
-              style={{
-                background: `linear-gradient(${115 + rotation.y * 2}deg, transparent 20%, rgba(255,255,255,0.3) 50%, transparent 80%)`
-              }}
-            />
+            {!isSelectionMode && (
+              <div 
+                className="absolute inset-0 pointer-events-none mix-blend-overlay opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+                style={{
+                  background: `linear-gradient(${115 + rotation.y * 2}deg, transparent 20%, rgba(255,255,255,0.3) 50%, transparent 80%)`
+                }}
+              />
+            )}
           </div>
 
           {/* LAYER 2: 3D POP-OUT CUTOUT */}
@@ -177,7 +204,6 @@ export const StarCard: React.FC<StarCardProps> = ({ star, onAddXP, onClick }) =>
                  src={currentCutout}
                  className="w-full h-full object-cover object-top transition-transform duration-100"
                  style={{ 
-                    // Base transform applied here, animation overrides/adds to it
                     filter: isHovering ? 'drop-shadow(0 15px 30px rgba(0,0,0,0.7)) brightness(1.1)' : 'drop-shadow(0 10px 20px rgba(0,0,0,0.5))',
                     animation: 'float-hologram 6s ease-in-out infinite'
                  }}
@@ -189,8 +215,8 @@ export const StarCard: React.FC<StarCardProps> = ({ star, onAddXP, onClick }) =>
           {/* LAYER 3: UI ELEMENTS */}
           <div className="absolute inset-0 pointer-events-none" style={{ transform: 'translateZ(50px)' }}>
             
-            {/* Carousel Controls */}
-            {hasMultipleImages && (
+            {/* Carousel Controls (Hide in select mode) */}
+            {hasMultipleImages && !isSelectionMode && (
               <div className="pointer-events-auto h-full w-full">
                 <button 
                   onClick={handlePrev}
@@ -207,17 +233,8 @@ export const StarCard: React.FC<StarCardProps> = ({ star, onAddXP, onClick }) =>
               </div>
             )}
 
-            {/* Indicators */}
-            {hasMultipleImages && (
-               <div className="absolute top-4 left-4 flex gap-1 z-20">
-                  {gallery.map((_, i) => (
-                     <div key={i} className={`h-1 rounded-full transition-all duration-300 ${i === currentIdx ? 'w-4 bg-rose-500' : 'w-1 bg-white/30'}`} />
-                  ))}
-               </div>
-            )}
-
             {/* Streak Indicator */}
-            {streak > 1 && (
+            {streak > 1 && !isSelectionMode && (
               <div className="absolute top-12 left-4 z-20 flex items-center gap-1 animate-pulse">
                 <Flame size={14} className="text-orange-500 fill-orange-500" />
                 <span className="text-[10px] font-bold text-orange-200 drop-shadow-[0_0_5px_rgba(249,115,22,0.8)]">
@@ -252,13 +269,15 @@ export const StarCard: React.FC<StarCardProps> = ({ star, onAddXP, onClick }) =>
               </div>
             </div>
 
-            {/* Add XP Button */}
-            <button 
-              onClick={(e) => { e.stopPropagation(); onAddXP(star.id); }}
-              className="absolute bottom-4 right-4 w-12 h-12 rounded-full bg-rose-600/90 text-white flex items-center justify-center shadow-[0_0_20px_rgba(225,29,72,0.4)] hover:bg-rose-500 hover:scale-110 active:scale-90 transition-all z-20 pointer-events-auto"
-            >
-              <Plus size={24} strokeWidth={2.5} />
-            </button>
+            {/* Add XP Button (Hidden in Select Mode) */}
+            {!isSelectionMode && (
+              <button 
+                onClick={(e) => { e.stopPropagation(); onAddXP(star.id); }}
+                className="absolute bottom-4 right-4 w-12 h-12 rounded-full bg-rose-600/90 text-white flex items-center justify-center shadow-[0_0_20px_rgba(225,29,72,0.4)] hover:bg-rose-500 hover:scale-110 active:scale-90 transition-all z-20 pointer-events-auto"
+              >
+                <Plus size={24} strokeWidth={2.5} />
+              </button>
+            )}
           </div>
         </div>
       </div>

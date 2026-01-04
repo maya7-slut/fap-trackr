@@ -1,5 +1,6 @@
+
 import React, { useState } from 'react';
-import { Settings, Key, Sparkles, X, ChevronRight, Save, Layout, Smartphone, Palette, Box, Check, Info } from 'lucide-react';
+import { Settings, Key, Sparkles, X, ChevronRight, Save, Layout, Smartphone, Palette, Box, Check, Info, ShieldCheck, Lock } from 'lucide-react';
 import { useToast } from '../context/ToastContext';
 import { useSettings, BorderStyle, CardShape } from '../context/SettingsContext';
 
@@ -88,37 +89,58 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, a
           {/* GENERAL TAB */}
           {activeTab === 'general' && (
             <div className="space-y-8">
+              
+              {/* AI Features Toggle Section */}
               <div className="space-y-4">
-                <div className="flex items-center gap-2 text-rose-300 text-sm font-bold uppercase tracking-wider">
-                  <Sparkles size={14} /> Neural Link (Gemini API)
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-rose-300 text-sm font-bold uppercase tracking-wider">
+                    <Sparkles size={14} /> AI Features
+                  </div>
+                  <button 
+                     onClick={() => updateSettings({ enableAI: !settings.enableAI })}
+                     className={`w-12 h-6 rounded-full transition-colors relative ${settings.enableAI ? 'bg-rose-600' : 'bg-stone-700'}`}
+                  >
+                     <div className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform ${settings.enableAI ? 'translate-x-6' : 'translate-x-0'}`} />
+                  </button>
                 </div>
-                <div className="bg-black/40 border border-white/10 rounded-xl p-4 space-y-3">
-                   <p className="text-xs text-stone-500">Required for AI Bios and Image Generation.</p>
-                   <div className="flex items-center gap-2 bg-black/50 border border-white/5 rounded-lg px-3 py-2">
-                     <Key size={14} className="text-stone-500" />
-                     <input 
-                       type="password" 
-                       value={keyInput}
-                       onChange={(e) => setKeyInput(e.target.value)}
-                       placeholder="Enter Google API Key"
-                       className="bg-transparent w-full text-sm text-white outline-none placeholder:text-stone-700 font-mono"
-                     />
-                   </div>
-                   <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noreferrer" className="text-[10px] text-rose-500 hover:underline flex items-center gap-1">
-                     Get API Key <ChevronRight size={10} />
-                   </a>
-                </div>
+
+                {settings.enableAI ? (
+                    <div className="bg-rose-900/10 border border-rose-500/20 rounded-xl p-4 space-y-4 animate-in fade-in slide-in-from-top-2">
+                       <div className="flex gap-2 items-start">
+                          <Lock size={16} className="text-rose-400 mt-1 shrink-0" />
+                          <p className="text-xs text-rose-200/80 leading-relaxed">
+                             Your API Key is <strong>encrypted</strong> and saved locally in your browser. We do not store it on our servers.
+                          </p>
+                       </div>
+                       
+                       <div className="flex items-center gap-2 bg-black/50 border border-white/5 rounded-lg px-3 py-2">
+                         <Key size={14} className="text-stone-500" />
+                         <input 
+                           type="password" 
+                           value={keyInput}
+                           onChange={(e) => setKeyInput(e.target.value)}
+                           placeholder="Paste Google Gemini Key..."
+                           className="bg-transparent w-full text-sm text-white outline-none placeholder:text-stone-700 font-mono"
+                         />
+                       </div>
+                       
+                       <div className="flex justify-between items-center">
+                          <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noreferrer" className="text-[10px] text-rose-500 hover:underline flex items-center gap-1">
+                             Get API Key <ChevronRight size={10} />
+                          </a>
+                          {!keyInput && <span className="text-[10px] text-stone-500 italic">Key required for AI</span>}
+                       </div>
+                    </div>
+                ) : (
+                    <div className="bg-black/40 border border-white/10 rounded-xl p-4 flex items-center gap-3">
+                       <ShieldCheck size={20} className="text-stone-500" />
+                       <p className="text-xs text-stone-500">
+                          AI features (Auto-Fill, Dream Weaver) are disabled. Enable to connect your Neural Link.
+                       </p>
+                    </div>
+                )}
               </div>
 
-              <div className="space-y-2">
-                 <div className="flex items-center gap-2 text-stone-300 text-sm font-bold uppercase tracking-wider">
-                   Info
-                 </div>
-                 <p className="text-xs text-stone-500 leading-relaxed">
-                   Fap Tracker v1.1.0. All data stored locally. 
-                   The "Pop-Out" 3D effect uses local ML.
-                 </p>
-              </div>
             </div>
           )}
 
@@ -151,7 +173,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, a
                            <Info size={14} className="text-stone-400 mt-0.5 shrink-0" />
                            <p className="text-[11px] text-stone-400 leading-relaxed">
                               <span className="text-stone-200 font-bold">Performance Note:</span> 
-                              If the dashboard feels choppy or battery drains quickly, disable this setting. The 3D cutout will be hidden, but not deleted.
+                              If the dashboard feels laggy disable this setting.
                            </p>
                         </div>
                     </div>

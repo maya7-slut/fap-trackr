@@ -42,6 +42,9 @@ export interface Star {
   favorite?: boolean;
   streak?: number;
   lastActiveDate?: string; // ISO Date string (YYYY-MM-DD)
+  
+  // Soft Delete
+  deletedAt?: string;
 }
 
 export interface GeminiConfig {
